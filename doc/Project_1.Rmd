@@ -1,0 +1,62 @@
+---
+title: "Project 1 An R Notebook Data Story on presidential inaugural speeches"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# Step 0: check and install needed packages. Load the libraries and functions. 
+ 
+
+```{r, message=FALSE, warning=FALSE}
+# load packages
+library("rvest")
+library("tibble")
+# You may need to run
+# sudo ln -f -s $(/usr/libexec/java_home)/jre/lib/server/libjvm.dylib /usr/local/lib
+# in order to load qdap
+# library("qdap")
+library("sentimentr")
+library("gplots")
+library("dplyr")
+library("tm")
+library("syuzhet")
+library("factoextra")
+library("beeswarm")
+library("scales")
+library("RColorBrewer")
+library("RANN")
+library("tm")
+library("topicmodels")
+library(tidytext)
+
+```
+
+```{r}
+print(R.version)
+```
+
+# Step 1: Data processing
+```{r,message=FALSE, warning=FALSE}
+folder.path="../data/inauguralSpeeches/"
+speeches=list.files(path = folder.path, pattern = "*.txt")
+prex.out=substr(speeches, 6, nchar(speeches)-4)
+
+ff.all<-Corpus(DirSource(folder.path))
+
+ff.all<-tm_map(ff.all, stripWhitespace)
+ff.all<-tm_map(ff.all, content_transformer(tolower))
+ff.all<-tm_map(ff.all, removeWords, stopwords("english"))
+ff.all<-tm_map(ff.all, removeWords, character(0))
+ff.all<-tm_map(ff.all, removePunctuation)
+
+tdm.all<-TermDocumentMatrix(ff.all)
+
+tdm.tidy=tidy(tdm.all)
+
+tdm.overall=summarise(group_by(tdm.tidy, term), sum(count))
+```
+
+
+
