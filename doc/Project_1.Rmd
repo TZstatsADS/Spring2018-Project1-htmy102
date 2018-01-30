@@ -1,5 +1,6 @@
 ---
 title: "Project 1 An R Notebook Data Story on presidential inaugural speeches"
+author: "Yuhao Kang (yk2758)"
 output:
   html_document:
     df_print: paged
@@ -30,14 +31,21 @@ library("RANN")
 library("tm")
 library("topicmodels")
 library(tidytext)
-
+library(tm)
+library(wordcloud)
+library(RColorBrewer)
+library(dplyr)
+library(tidytext)
+library(xlsx)
+source("../lib/plotstacked.R")
+source("../lib/speechFuncs.R")
 ```
 
 ```{r}
 print(R.version)
 ```
-
-# Step 1: Data processing
+# Part 1: WordCLoud 
+## Step 1: Data processing
 ```{r,message=FALSE, warning=FALSE}
 folder.path="../data/inauguralSpeeches/"
 speeches=list.files(path = folder.path, pattern = "*.txt")
@@ -53,10 +61,242 @@ ff.all<-tm_map(ff.all, removePunctuation)
 
 tdm.all<-TermDocumentMatrix(ff.all)
 
-tdm.tidy=tidy(tdm.all)
+tdm.tidy <- tidy(tdm.all)
 
-tdm.overall=summarise(group_by(tdm.tidy, term), sum(count))
+tdm.overall <- summarise(group_by(tdm.tidy, term), sum(count))
+
+tdm.overall <- tdm.overall[order(tdm.overall$`sum(count)`, decreasing = T),]
+
+head(tdm.overall,10)
 ```
 
+##Step 2 - Inspect an overall wordcloud
+```{r, fig.height=6, fig.width=6}
+wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(5,0.5),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Blues"))
+```
+
+#Part 2-
+## Step 1: Data processing -- import Data
+
+```{r,message=FALSE, warning=FALSE}
+### Inauguaral speeches
+main.page <- read_html(x = "http://www.presidency.ucsb.edu/inaugurals.php")
+# Get link URLs
+# f.speechlinks is a function for extracting links from the list of speeches. 
+inaug=f.speechlinks(main.page)
+head(inaug)
+colnames(inaug) <- c("Date","Links")
+Sys.getlocale("LC_TIME")
+Sys.setlocale("LC_TIME","C")
+inaug[,1] <-as.Date(inaug[,1], format="%B %e, %Y")
+inaug=inaug[-nrow(inaug),] # remove the last line, irrelevant due to error.
+```
+
+```{r}
+inaug.list <- read.xlsx("../data/InaugurationInfo.xlsx",sheetIndex = 1,header = T)
+inaug.list <- cbind(inaug.list,inaug)
+
+inaug.list$fulltext=NA
+for(i in seq(nrow(inaug.list))) {
+  text <- read_html(inaug.list$Links[i]) %>% # load the page
+    html_nodes(".displaytext") %>% # isloate the text
+    html_text() # get the text
+  inaug.list$fulltext[i]=text
+}
+```
+
+## Step 2: data Processing --- generate list of sentences
+```{r,message=FALSE, warning=FALSE}
+sentence.list=NULL
+for(i in 1:nrow(inaug.list)){
+  sentences=sent_detect(inaug.list$fulltext[i],
+                        endmarks = c("?", ".", "!", "|",";"))
+  if(length(sentences)>0){
+    emotions=get_nrc_sentiment(sentences)
+    word.count=word_count(sentences)
+    # colnames(emotions)=paste0("emo.", colnames(emotions))
+    # in case the word counts are zeros?
+    emotions=diag(1/(word.count+0.01))%*%as.matrix(emotions)
+    sentence.list=rbind(sentence.list, 
+                        cbind(inaug.list[i,-ncol(inaug.list)],
+                              sentences=as.character(sentences), 
+                              word.count,
+                              emotions,
+                              sent.id=1:length(sentences)
+                              )
+    )
+  }
+}
+
+sentence.list=
+  sentence.list%>%
+  filter(!is.na(word.count))
+
+```
+
+# Step 5: Data analysis --- Topic modeling
+
+For topic modeling, we prepare a corpus of sentence snipets as follows. For each speech, we start with sentences and prepare a snipet with a given sentence with the flanking sentences. 
+
+```{r}
+corpus.list=sentence.list[2:(nrow(sentence.list)-1), ]
+sentence.pre=sentence.list$sentences[1:(nrow(sentence.list)-2)]
+sentence.post=sentence.list$sentences[3:(nrow(sentence.list)-1)]
+corpus.list$snippets=paste(sentence.pre, corpus.list$sentences, sentence.post, sep=" ")
+rm.rows=(1:nrow(corpus.list))[corpus.list$sent.id==1]
+rm.rows=c(rm.rows, rm.rows-1)
+corpus.list=corpus.list[-rm.rows, ]
+```
+
+## Text mining
+```{r}
+docs <- Corpus(VectorSource(corpus.list$snippets))
+```
+
+
+### Text basic processing
+Adapted from <https://eight2late.wordpress.com/2015/09/29/a-gentle-introduction-to-topic-modeling-using-r/>.
+
+```{r}
+#remove potentially problematic symbols
+docs <-tm_map(docs,content_transformer(tolower))
+
+#remove punctuation
+docs <- tm_map(docs, removePunctuation)
+
+#Strip digits
+docs <- tm_map(docs, removeNumbers)
+
+#remove stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+#remove whitespace
+docs <- tm_map(docs, stripWhitespace)
+
+#Stem document
+docs <- tm_map(docs,stemDocument)
+```
+
+```{r}
+dtm <- DocumentTermMatrix(docs)
+#convert rownames to filenames#convert rownames to filenames
+rownames(dtm) <- paste(corpus.list$File,
+                       corpus.list$Term, corpus.list$sent.id, sep="_")
+
+rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
+
+dtm  <- dtm[rowTotals> 0, ]
+corpus.list=corpus.list[rowTotals>0, ]
+```
+
+```{r}
+#Set parameters for Gibbs sampling
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 15
+
+#Run LDA using Gibbs sampling
+ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+#write out results
+#docs to topics
+ldaOut.topics <- as.matrix(topics(ldaOut))
+table(c(1:k, ldaOut.topics))
+write.csv(ldaOut.topics,file=paste("../output/LDAGibbs",k,"DocsToTopics.csv"))
+
+#top 6 terms in each topic
+ldaOut.terms <- as.matrix(terms(ldaOut,15))
+write.csv(ldaOut.terms,file=paste("../output/LDAGibbs",k,"TopicsToTerms.csv"))
+
+#probabilities associated with each topic assignment
+topicProbabilities <- as.data.frame(ldaOut@gamma)
+write.csv(topicProbabilities,file=paste("../output/LDAGibbs",k,"TopicProbabilities.csv"))
+```
+
+```{r}
+terms.beta=ldaOut@beta
+terms.beta=scale(terms.beta)
+topics.terms=NULL
+for(i in 1:k){
+  topics.terms=rbind(topics.terms, ldaOut@terms[order(terms.beta[i,], decreasing = TRUE)[1:7]])
+}
+topics.terms
+ldaOut.terms
+```
+
+
+```{r}
+topics.hash=c("Military", "WorldPeace", "Time", "Economy", 
+              "Nation", "Responsibility", "Hope", "Equality", 
+              "America", "Politic", "WorkingFamilies", "Legislation", 
+              "Community", "Government", "Patriotism")
+corpus.list$ldatopic=as.vector(ldaOut.topics)
+corpus.list$ldahash=topics.hash[ldaOut.topics]
+
+colnames(topicProbabilities)=topics.hash
+corpus.list.df=cbind(corpus.list, topicProbabilities)
+```
+
+## Clustering of topics
+```{r, fig.width=6, fig.height=6}
+par(mar=c(1,1,1,1))
+topic.summary=tbl_df(corpus.list.df)%>%
+              select(File, Military:Patriotism)%>%
+              group_by(File)%>%
+              summarise_all(funs(mean))
+topic.summary=as.data.frame(topic.summary)
+rownames(topic.summary)=topic.summary[,1]
+
+# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+topic.plot=c(1, 13, 9, 11, 8, 3, 7)
+print(topics.hash[topic.plot])
+
+heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none")
+```
+
+```{r, fig.width=3.3, fig.height=5}
+# [1] "Economy"         "America"         "Defense"         "Belief"         
+# [5] "Election"        "Patriotism"      "Unity"           "Government"     
+# [9] "Reform"          "Temporal"        "WorkingFamilies" "Freedom"        
+# [13] "Equality"        "Misc"            "Legislation"       
+ 
+
+par(mfrow=c(3, 1), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
+
+topic.plot=c(1, 13, 14, 15, 8, 9, 12)
+print(topics.hash[topic.plot])
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="JamesMonroe", Term==1)%>%
+  select(sent.id, Military:Patriotism)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1], 
+             xlab="Sentences", ylab="Topic share", main="George Bush, Nomination")
+```
 
 
