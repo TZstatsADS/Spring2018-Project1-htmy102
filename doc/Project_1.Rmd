@@ -4,6 +4,7 @@ author: "Yuhao Kang (yk2758)"
 output: html_notebook
 ---
 ##Where the story begins:
+
 As we all know, United States of American is a young country. But in its 241 years history, US has grown up as the most powerful country all over the world quickly. When we are suprised by its amaziong growing spped, I want to find something also repaidly changed in this country. So I decide to analyse the Presidents' Inaugural Speeches by comparing recent presidents and their great antecessors, who built the solid foundation of USA. First, let's take a look at them!  
 
 ![**_The First 5 Presidens of US_**](../figs/first_5.png)  
@@ -365,84 +366,7 @@ heatmap.2(as.matrix(topic.summary[,topic.plot+1]),
 
 From the respectively clustering, we can find that the topic they emphasize are different from time to time. To be more clear, we can plot the topic share condition to the next step analysis.
 
-
-
-```{r, fig.width=7, fig.height=7}
-# [1] "Military"  "WorldPeace"  "Time"  "Economy", 
-# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
-# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
-# [13] "Community"  "Government"  "Patriotism"
-
-par(mfcol=c(5, 2), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
-
-topic.plot=c(1,2,4,5,8,9,10,11,12,15)
-print(topics.hash[topic.plot])
-
-recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
-founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
-
-for(i in 5:1){
-  speech.df=tbl_df(corpus.list.df)%>%filter(File==recent_presidents[i],  Term==1)%>%
-    select(sent.id, Military:Patriotism)
-  speech.df=as.matrix(speech.df)
-  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
-               xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
-  
-}
-
-for(i in 5:1){
-  speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
-    select(sent.id, Military:Patriotism)
-  speech.df=as.matrix(speech.df)
-  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
-               xlab="Sentences", ylab="Topic share", main=founding_presidents[i])
-  
-}
-
-```
-
-```{r, fig.width=7, fig.height=7}
-# [1] "Military"  "WorldPeace"  "Time"  "Economy", 
-# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
-# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
-# [13] "Community"  "Government"  "Patriotism"
-
-par(mfcol=c(5, 2), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
-
-topic.plot=c(1,2,8,9,12)
-print(topics.hash[topic.plot])
-
-recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
-founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
-
-for(i in 5:1){
-  speech.df=tbl_df(corpus.list.df)%>%filter(File==recent_presidents[i],  Term==1)%>%
-    select(sent.id, Military:Patriotism)
-  speech.df=as.matrix(speech.df)
-  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
-               xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
-  
-}
-
-for(i in 5:1){
-  speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
-    select(sent.id, Military:Patriotism)
-  speech.df=as.matrix(speech.df)
-  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
-               xlab="Sentences", ylab="Topic share", main=founding_presidents[i])
-  
-}
-
-```
-
+## Topic shares
 
 ```{r, fig.width=9, fig.height=7}
 # [1] "Military"  "WorldPeace"  "Time"  "Economy", 
@@ -466,6 +390,7 @@ for(i in 5:1){
                xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
   
 }
+
 
 for(i in 5:1){
   speech.df=tbl_df(corpus.list.df)%>%filter(File==middle_presidents[i],  Term==1)%>%
@@ -491,15 +416,56 @@ for(i in 5:1){
 
 ```
 
-To research the difference of their inaugural speeches between recent presidents and their antecessors, I plot how their speech topics distributed.
+This is a topics share plot of 15 US presidents from 3 different time periods, especially between the recent speeches (first column) and old speeches (third column). Obviously, in each time period, there are some interesting unique characters of their innaugural speeches. In most recent speeches (first column), the share of yellow part and sky blue are really big, and we notice that they represent _"WorldPeace"_ and _"American"_. But in the oldest 5 speeches, the share of purple, pink and green are higher than them in another 2 columns, which represent _"Legislation"_, _"Patriotism"_ and _"Nation"_. The differernce between the most recent 5 and the oldest 5 are more significant than middle 5, so our next step is mainly on those 2 styles.
 
 
-# Part 2: sentence length
-## Step 1: 
+Here we choice their most similar and most different topics _("Military", "WorldPeace", "Economy", "Equality", "America", "Legislation","Patriotism")_ to compare:
+
+```{r, fig.width=7, fig.height=7}
+# [1] "Military"  "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+par(mfcol=c(5, 2), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
+
+topic.plot=c(1,2,4,8,9,12,15)
+print(topics.hash[topic.plot])
+
+recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
+founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==recent_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
+  
+}
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=founding_presidents[i])
+  
+}
+
+```
 
 
-# Part 3: WordCLoud 
-## Step 1: Data processing
+Clearly, the new fashion and old fashion are very different! Compared with thier antecessors, recent presidents seems focus more on WorldPeace (international affairs) when giving their inaguraul speeches. However, the first founders of this counrty cares more about Legislation and Patriotism. Besides, even if they both mentioned Military in their speeches, their antecessors obviously pay more attention on it.
+
+Then I will use wordCloud to show you the most frequently used words in those different time periods.
+
+## WordCLoud 
+
 ```{r,message=FALSE, warning=FALSE,fig.height=3, fig.width=9}
 
 par(mfrow=c(1,3), mar=c(0,0,0,0), bty="n", xaxt="n", yaxt="n", font.main=1)
@@ -519,6 +485,18 @@ speechesCloud(middle_locale,150,color=brewer.pal(9,"Greens"))
 speechesCloud(founding_locale,150,color=brewer.pal(9,"Blues"))
 
 ```
-##Step 2 - Inspect an overall wordcloud
+
+The results seems good because we have found some words are always used in their speechs like _governmentm, people, country and American_. However, it is a bit strange that the most used word is always _"will"_, and I think that may because _"will"_ is a modal verb but also a notional verb at the sam time. We may need futher disscussion on how to treat problems like that.
+
+##End of th story:
+
+From all above analysis, we can find something rapidly changed as time went by. When USA was just established, the biggest problem they face is building a system to keep the whole country runs well in a long term. So we can see the topics mentioned most by first 5 presidents are Legislation and Patriotism, which helps them establish the state order bring the people together. This is also the cornerstone of the rapid development of the USA. 
+
+Now, this country is no longer the new born from the War of Independence. US is now the most powerful country all over the world and has huge influence on this world than any other countries. So most recent inaguraul speeches focused more on international affairs than before. From the topics change of inagural speeches, we could see a great country 's growing history with time trend. 
+
+But no matter how powerful the United States are, there are something unchanged: _People, Nation, America, Freedom，War_ and many universal values. And I think that is why US became the superpower in such a short history. Any government should always be concerned with its people and their rights, for this is the source of superpower.
+
+
+
 
 
