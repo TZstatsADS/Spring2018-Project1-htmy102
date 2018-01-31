@@ -1,13 +1,36 @@
 ---
-title: "Project 1 An R Notebook Data Story on presidential inaugural speeches"
+title: "Inaugural Speeches：Recent Presidents and Their Antecessors"
 author: "Yuhao Kang (yk2758)"
 output: html_notebook
 ---
+##Where the story begins:
+As we all know, United States of American is a young country. But in its 241 years history, US has grown up as the most powerful country all over the world quickly. When we are suprised by its amaziong growing spped, I want to find something also repaidly changed in this country. So I decide to analyse the Presidents' Inaugural Speeches by comparing recent presidents and their great antecessors, who built the solid foundation of USA. First, let's take a look at them!  
 
-# Step 0: check and install needed packages. Load the libraries and functions. 
- 
+![**_The First 5 Presidens of US_**](../figs/first_5.png)  
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+
+![**_Recent 5 Presidens of US_**](../figs/recent_5.png)  
+
+Clearly, their hairstyles changed a lot as time went by. But today, I will focus more on thier **Inaugural Speeches Topics** rather than hairstyle. To realize this analysis, I will use topic modeling method given in last lecture.
+
+### Step 0: Check and install needed packages. Load the libraries and functions. 
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+packages.used=c("rvest", "tibble", "qdap", 
+                "sentimentr", "gplots", "dplyr",
+                "tm", "syuzhet", "factoextra", 
+                "beeswarm", "scales", "RColorBrewer",
+                "RANN", "tm", "topicmodels","tidytext",
+                "wordCloud","RColorBrewer", "readxl")
+
+# check packages that need to be installed.
+packages.needed=setdiff(packages.used, 
+                        intersect(installed.packages()[,1], 
+                                  packages.used))
+# install additional packages
+if(length(packages.needed)>0){
+  install.packages(packages.needed, dependencies = TRUE)
+}
+
 # load packages
 library("rvest")
 library("tibble")
@@ -27,80 +50,47 @@ library("RColorBrewer")
 library("RANN")
 library("tm")
 library("topicmodels")
-library(tidytext)
-library(tm)
-library(wordcloud)
-library(RColorBrewer)
-library(dplyr)
-library(tidytext)
-library(readxl)
+library("tidytext")
+library("wordcloud")
+library("RColorBrewer")
+library("readxl")
 source("../lib/plotstacked.R")
 source("../lib/speechFuncs.R")
+
+# a function to plot wordcloud of specific speech
+source("../lib/speechesCLoud.R") 
 ```
 
 ```{r}
 print(R.version)
 ```
-# Part 1: WordCLoud 
-## Step 1: Data processing
-```{r,message=FALSE, warning=FALSE}
-folder.path="../data/inauguralSpeeches/"
-speeches=list.files(path = folder.path, pattern = "*.txt")
-prex.out=substr(speeches, 6, nchar(speeches)-4)
 
-ff.all<-Corpus(DirSource(folder.path))
-
-ff.all<-tm_map(ff.all, stripWhitespace)
-ff.all<-tm_map(ff.all, content_transformer(tolower))
-ff.all<-tm_map(ff.all, removeWords, stopwords("english"))
-ff.all<-tm_map(ff.all, removeWords, character(0))
-ff.all<-tm_map(ff.all, removePunctuation)
-
-tdm.all<-TermDocumentMatrix(ff.all)
-
-tdm.tidy <- tidy(tdm.all)
-
-tdm.overall <- summarise(group_by(tdm.tidy, term), sum(count))
-
-tdm.overall <- tdm.overall[order(tdm.overall$`sum(count)`, decreasing = T),]
-
-head(tdm.overall,10)
-```
-
-##Step 2 - Inspect an overall wordcloud
-```{r, fig.height=6, fig.width=6}
-wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
-          scale=c(5,0.5),
-          max.words=100,
-          min.freq=1,
-          random.order=FALSE,
-          rot.per=0.3,
-          use.r.layout=T,
-          random.color=FALSE,
-          colors=brewer.pal(9,"Blues"))
-```
-
-#Part 2-
+#Part 1- Topic Analysis of Inaugural Speeches
 ## Step 1: Data processing -- import Data
+In this step, we combine the information of each inaugural speeches into one list named **inaug.list**.
 
-```{r,message=FALSE, warning=FALSE}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 ### Inauguaral speeches
 main.page <- read_html(x = "http://www.presidency.ucsb.edu/inaugurals.php")
 # Get link URLs
 # f.speechlinks is a function for extracting links from the list of speeches. 
 inaug=f.speechlinks(main.page)
-head(inaug)
+
 colnames(inaug) <- c("Date","Links")
-Sys.getlocale("LC_TIME")
-Sys.setlocale("LC_TIME","C")
+# To avoid some problems when we transform the date format.
+if(Sys.getlocale("LC_TIME") != "C"){
+  Sys.setlocale("LC_TIME","C")
+}
+
+
 inaug[,1] <-as.Date(inaug[,1], format="%B %e, %Y")
 inaug=inaug[-nrow(inaug),] # remove the last line, irrelevant due to error.
-```
 
-```{r}
+# Import the information data of inauguration speeches.
 inaug.list <- read_excel("../data/InaugurationInfo.xlsx")
 inaug.list <- cbind(inaug.list,inaug)
 
+# Read in full text
 inaug.list$fulltext=NA
 for(i in seq(nrow(inaug.list))) {
   text <- read_html(inaug.list$Links[i]) %>% # load the page
@@ -108,9 +98,14 @@ for(i in seq(nrow(inaug.list))) {
     html_text() # get the text
   inaug.list$fulltext[i]=text
 }
+head(inaug.list)
 ```
 
-## Step 2: data Processing --- generate list of sentences
+
+
+## Step 2: Data Processing --- generate list of sentences
+
+
 ```{r,message=FALSE, warning=FALSE}
 sentence.list=NULL
 for(i in 1:nrow(inaug.list)){
@@ -133,56 +128,48 @@ for(i in 1:nrow(inaug.list)){
   }
 }
 
+# omit NAs
+sentence.list$Type = "inaug"
 sentence.list=
   sentence.list%>%
   filter(!is.na(word.count))
 
 ```
 
-# Step 5: Data analysis --- Topic modeling
-
-For topic modeling, we prepare a corpus of sentence snipets as follows. For each speech, we start with sentences and prepare a snipet with a given sentence with the flanking sentences. 
+## Step 3: Data analysis --- Topic modeling
+### Create snippets corpus
+For topic modeling, we prepare a corpus of sentence snippets as follows. For each speech, we start with sentences and prepare a snippet with a given sentence with the flanking sentences. And then we use these snipets to creat our corpus to analysis.
 
 ```{r}
+# prepare sentence snippets (3 continuing sentences)
 corpus.list=sentence.list[2:(nrow(sentence.list)-1), ]
 sentence.pre=sentence.list$sentences[1:(nrow(sentence.list)-2)]
 sentence.post=sentence.list$sentences[3:(nrow(sentence.list)-1)]
 corpus.list$snippets=paste(sentence.pre, corpus.list$sentences, sentence.post, sep=" ")
+
+# avoid snippets combining senstences from different speeches
 rm.rows=(1:nrow(corpus.list))[corpus.list$sent.id==1]
 rm.rows=c(rm.rows, rm.rows-1)
 corpus.list=corpus.list[-rm.rows, ]
-```
 
-## Text mining
-```{r}
+# creat our corpus
 docs <- Corpus(VectorSource(corpus.list$snippets))
 ```
 
 
-### Text basic processing
-Adapted from <https://eight2late.wordpress.com/2015/09/29/a-gentle-introduction-to-topic-modeling-using-r/>.
+### Clean our corpus
 
+For this corpus, we remove extra white space, convert all letters to the lower case, remove [stop words](https://github.com/arc12/Text-Mining-Weak-Signals/wiki/Standard-set-of-english-stopwords), removed empty words due to formatting errors, and remove punctuation. Then we compute the [Document-Term Matrix (DTM)](https://en.wikipedia.org/wiki/Document-term_matrix). 
 ```{r}
 #remove potentially problematic symbols
 docs <-tm_map(docs,content_transformer(tolower))
-
-#remove punctuation
 docs <- tm_map(docs, removePunctuation)
-
-#Strip digits
 docs <- tm_map(docs, removeNumbers)
-
-#remove stopwords
 docs <- tm_map(docs, removeWords, stopwords("english"))
-
-#remove whitespace
 docs <- tm_map(docs, stripWhitespace)
-
-#Stem document
 docs <- tm_map(docs,stemDocument)
-```
 
-```{r}
+#compute Document-Term Matrix
 dtm <- DocumentTermMatrix(docs)
 #convert rownames to filenames#convert rownames to filenames
 rownames(dtm) <- paste(corpus.list$File,
@@ -193,6 +180,8 @@ rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
 dtm  <- dtm[rowTotals> 0, ]
 corpus.list=corpus.list[rowTotals>0, ]
 ```
+
+### Run LDA topic models
 
 ```{r}
 #Set parameters for Gibbs sampling
@@ -226,6 +215,7 @@ topicProbabilities <- as.data.frame(ldaOut@gamma)
 write.csv(topicProbabilities,file=paste("../output/LDAGibbs",k,"TopicProbabilities.csv"))
 ```
 
+### Analysis of topics
 ```{r}
 terms.beta=ldaOut@beta
 terms.beta=scale(terms.beta)
@@ -233,11 +223,11 @@ topics.terms=NULL
 for(i in 1:k){
   topics.terms=rbind(topics.terms, ldaOut@terms[order(terms.beta[i,], decreasing = TRUE)[1:7]])
 }
-head(topics.terms)
-head(ldaOut.terms)
+topics.terms
+ldaOut.terms
 ```
 
-
+From the 15 topics in LDA result, we can conclude 15 topic names by studing their components.Based on the most popular terms and the most salient terms for each topic, we can get the following hashtags to each topic.
 ```{r}
 topics.hash=c("Military", "WorldPeace", "Time", "Economy", 
               "Nation", "Responsibility", "Hope", "Equality", 
@@ -251,8 +241,9 @@ corpus.list.df=cbind(corpus.list, topicProbabilities)
 ```
 
 ## Clustering of topics
+Now we have topics and thier probabilitie given by LDA model. Then we can cluster them.
 ```{r, fig.width=5, fig.height=9}
-#par(mar=c(1,1,1,1))
+par(mar=c(1,1,1,1))
 topic.summary=tbl_df(corpus.list.df)%>%
               select(File, Military:Patriotism)%>%
               group_by(File)%>%
@@ -272,8 +263,109 @@ heatmap.2(as.matrix(topic.summary[,topic.plot+1]),
           scale = "column", key=F, 
           col = bluered(100),
           cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
-          trace = "none", density.info = "none")
+          trace = "none", density.info = "none", main="All presidents")
 ```
+
+From above clustering fig, it seems the topic did not clustered very clearly. So we go to the next step and pick up the most recent 5 presidents, the first 5 presidents and 5 presidents from the middle of timeline.
+
+```{r}
+recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
+middle_presidents <- c("BenjaminHarrison","GroverCleveland-I","WilliamMcKinley",
+                       "TheodoreRoosevelt","WilliamHowardTaft")
+founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
+```
+
+Then we do cluster again:
+```{r, fig.width=5, fig.height=5}
+par(mar=c(1,1,1,1))
+
+recent_df <- NULL
+for(i in 1:length(recent_presidents)){
+  recent_df <- rbind(recent_df, corpus.list.df[corpus.list.df$File==recent_presidents[i],])
+}
+topic.summary=tbl_df(recent_df)%>%
+              select(File, Military:Patriotism)%>%
+              group_by(File)%>%
+              summarise_all(funs(mean))
+topic.summary=as.data.frame(topic.summary)
+rownames(topic.summary)=topic.summary[,1]
+
+# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+topic.plot=c(1 :15)
+print(topics.hash[topic.plot])
+
+heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none",main="Recent 5 President")
+```
+
+```{r, fig.width=5, fig.height=5}
+par(mar=c(1,1,1,1))
+
+middle_df <- NULL
+for(i in 1:length(middle_presidents)){
+  middle_df <- rbind(middle_df, corpus.list.df[corpus.list.df$File==middle_presidents[i],])
+}
+topic.summary=tbl_df(middle_df)%>%
+              select(File, Military:Patriotism)%>%
+              group_by(File)%>%
+              summarise_all(funs(mean))
+topic.summary=as.data.frame(topic.summary)
+rownames(topic.summary)=topic.summary[,1]
+
+# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+topic.plot=c(1 :15)
+print(topics.hash[topic.plot])
+
+heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none",main="Middle 5 Presidents")
+```
+
+```{r, fig.width=5, fig.height=5}
+par(mar=c(1,1,1,1))
+
+founding_df <- NULL
+for(i in 1:length(founding_presidents)){
+  founding_df <- rbind(founding_df, corpus.list.df[corpus.list.df$File==founding_presidents[i],])
+}
+topic.summary=tbl_df(founding_df)%>%
+              select(File, Military:Patriotism)%>%
+              group_by(File)%>%
+              summarise_all(funs(mean))
+topic.summary=as.data.frame(topic.summary)
+rownames(topic.summary)=topic.summary[,1]
+
+# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+topic.plot=c(1 :15)
+print(topics.hash[topic.plot])
+
+heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
+          scale = "column", key=F, 
+          col = bluered(100),
+          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none",main="First 5 Presidents")
+```
+
+From the respectively clustering, we can find that the topic they emphasize are different from time to time. To be more clear, we can plot the topic share condition to the next step analysis.
+
+
 
 ```{r, fig.width=7, fig.height=7}
 # [1] "Military"  "WorldPeace"  "Time"  "Economy", 
@@ -300,7 +392,7 @@ for(i in 5:1){
   
 }
 
-for(i in 1:5){
+for(i in 5:1){
   speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
     select(sent.id, Military:Patriotism)
   speech.df=as.matrix(speech.df)
@@ -312,5 +404,121 @@ for(i in 1:5){
 }
 
 ```
+
+```{r, fig.width=7, fig.height=7}
+# [1] "Military"  "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+par(mfcol=c(5, 2), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
+
+topic.plot=c(1,2,8,9,12)
+print(topics.hash[topic.plot])
+
+recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
+founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==recent_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
+  
+}
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=founding_presidents[i])
+  
+}
+
+```
+
+
+```{r, fig.width=9, fig.height=7}
+# [1] "Military"  "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
+
+par(mfcol=c(5, 3), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
+
+topic.plot=c(1,2,4,5,8,9,10,11,12,15)
+print(topics.hash[topic.plot])
+
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==recent_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
+  
+}
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==middle_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=middle_presidents[i])
+  
+}
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=founding_presidents[i])
+  
+}
+
+```
+
+To research the difference of their inaugural speeches between recent presidents and their antecessors, I plot how their speech topics distributed.
+
+
+# Part 2: sentence length
+## Step 1: 
+
+
+# Part 3: WordCLoud 
+## Step 1: Data processing
+```{r,message=FALSE, warning=FALSE,fig.height=3, fig.width=9}
+
+par(mfrow=c(1,3), mar=c(0,0,0,0), bty="n", xaxt="n", yaxt="n", font.main=1)
+
+folder.path="../data/inauguralSpeeches/"
+recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
+middle_presidents <- c("BenjaminHarrison","GroverCleveland-I","WilliamMcKinley",
+                       "TheodoreRoosevelt","WilliamHowardTaft")
+founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
+
+recent_locale <- paste(folder.path,"inaug",recent_presidents,"-1.txt",sep = "")
+middle_locale <- paste(folder.path,"inaug",middle_presidents,"-1.txt",sep = "")
+founding_locale <- paste(folder.path,"inaug",founding_presidents,"-1.txt",sep = "")
+
+speechesCloud(recent_locale,150,color=brewer.pal(9,"Reds"))
+speechesCloud(middle_locale,150,color=brewer.pal(9,"Greens"))
+speechesCloud(founding_locale,150,color=brewer.pal(9,"Blues"))
+
+```
+##Step 2 - Inspect an overall wordcloud
 
 
