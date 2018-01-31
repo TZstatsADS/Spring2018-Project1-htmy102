@@ -67,7 +67,7 @@ print(R.version)
 ```
 
 #Part 1- Topic Analysis of Inaugural Speeches
-## Step 1: Data processing -- import Data
+##1.1 Data processing -- import Data
 In this step, we combine the information of each inaugural speeches into one list named **inaug.list**.
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
@@ -104,7 +104,7 @@ head(inaug.list)
 
 
 
-## Step 2: Data Processing --- generate list of sentences
+##1.2 Data Processing --- generate list of sentences
 
 
 ```{r,message=FALSE, warning=FALSE}
@@ -137,8 +137,8 @@ sentence.list=
 
 ```
 
-## Step 3: Data analysis --- Topic modeling
-### Create snippets corpus
+##1.3 Data analysis --- Topic modeling
+###1.3.1 Create snippets corpus
 For topic modeling, we prepare a corpus of sentence snippets as follows. For each speech, we start with sentences and prepare a snippet with a given sentence with the flanking sentences. And then we use these snipets to creat our corpus to analysis.
 
 ```{r}
@@ -158,7 +158,7 @@ docs <- Corpus(VectorSource(corpus.list$snippets))
 ```
 
 
-### Clean our corpus
+###1.3.2. Clean our corpus
 
 For this corpus, we remove extra white space, convert all letters to the lower case, remove [stop words](https://github.com/arc12/Text-Mining-Weak-Signals/wiki/Standard-set-of-english-stopwords), removed empty words due to formatting errors, and remove punctuation. Then we compute the [Document-Term Matrix (DTM)](https://en.wikipedia.org/wiki/Document-term_matrix). 
 ```{r}
@@ -182,7 +182,7 @@ dtm  <- dtm[rowTotals> 0, ]
 corpus.list=corpus.list[rowTotals>0, ]
 ```
 
-### Run LDA topic models
+###1.3.3 Run LDA topic models
 
 ```{r}
 #Set parameters for Gibbs sampling
@@ -216,7 +216,8 @@ topicProbabilities <- as.data.frame(ldaOut@gamma)
 write.csv(topicProbabilities,file=paste("../output/LDAGibbs",k,"TopicProbabilities.csv"))
 ```
 
-### Analysis of topics
+##1.4 Analysis of topics
+###1.4.1 Topics hashtags 
 ```{r}
 terms.beta=ldaOut@beta
 terms.beta=scale(terms.beta)
@@ -241,7 +242,7 @@ colnames(topicProbabilities)=topics.hash
 corpus.list.df=cbind(corpus.list, topicProbabilities)
 ```
 
-## Clustering of topics
+###1.4.2. Clustering of topics
 Now we have topics and thier probabilitie given by LDA model. Then we can cluster them.
 ```{r, fig.width=5, fig.height=9}
 par(mar=c(1,1,1,1))
@@ -366,7 +367,7 @@ heatmap.2(as.matrix(topic.summary[,topic.plot+1]),
 
 From the respectively clustering, we can find that the topic they emphasize are different from time to time. To be more clear, we can plot the topic share condition to the next step analysis.
 
-## Topic shares
+###1.4.3. Topic shares
 
 ```{r, fig.width=9, fig.height=7}
 # [1] "Military"  "WorldPeace"  "Time"  "Economy", 
@@ -464,7 +465,8 @@ Clearly, the new fashion and old fashion are very different! Compared with thier
 
 Then I will use wordCloud to show you the most frequently used words in those different time periods.
 
-## WordCLoud 
+#Part 2- WordCloud and conclusion
+##2.1 WordCLoud 
 
 ```{r,message=FALSE, warning=FALSE,fig.height=3, fig.width=9}
 
@@ -486,9 +488,20 @@ speechesCloud(founding_locale,150,color=brewer.pal(9,"Blues"))
 
 ```
 
-The results seems good because we have found some words are always used in their speechs like _governmentm, people, country and American_. However, it is a bit strange that the most used word is always _"will"_, and I think that may because _"will"_ is a modal verb but also a notional verb at the sam time. We may need futher disscussion on how to treat problems like that.
+The results seems good because we have found some words are always used in their speechs like _governmentm, people, country and American_. 
+However, it is a bit strange that the most used word is always _"will"_, and I think that may because _"will"_ is a modal verb but also a notional verb at the sam time. We may need futher disscussion on how to treat problems like that.(In this version I remove all _"will"_)
 
-##End of th story:
+```{r,warning=FALSE,fig.height=3, fig.width=9}
+par(mfrow=c(1,3), mar=c(0,0,0,0), bty="n", xaxt="n", yaxt="n", font.main=1)
+
+
+speechesCloud(recent_locale,150,color=brewer.pal(9,"Reds"),rm.words = "will")
+speechesCloud(middle_locale,150,color=brewer.pal(9,"Greens"),rm.words = "will")
+speechesCloud(founding_locale,150,color=brewer.pal(9,"Blues"),rm.words = "will")
+```
+
+
+##2.2 End of th story:
 
 From all above analysis, we can find something rapidly changed as time went by. When USA was just established, the biggest problem they face is building a system to keep the whole country runs well in a long term. So we can see the topics mentioned most by first 5 presidents are Legislation and Patriotism, which helps them establish the state order bring the people together. This is also the cornerstone of the rapid development of the USA. 
 

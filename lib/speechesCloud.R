@@ -1,4 +1,4 @@
-speechesCloud <- function(filenames,max=100,color=brewer.pal(9,"Blues")){
+speechesCloud <- function(filenames,max=100,color=brewer.pal(9,"Blues"), rm.words = character(0)){
   mydoc<- NULL
   for(i in 1:length(filenames)){
     newdoc<-readLines(filenames[i])
@@ -14,7 +14,10 @@ speechesCloud <- function(filenames,max=100,color=brewer.pal(9,"Blues")){
   docs <-tm_map(  docs , removeWords, stopwords("english"))
   docs <-tm_map(  docs , removeWords, character(0))
   docs <-tm_map(  docs , removePunctuation)
-
+  docs <-tm_map(  docs , removePunctuation)
+  # remove modal verb
+  docs <-tm_map(  docs , removeWords, rm.words)
+  
   #make TDM
   tdm.all<-TermDocumentMatrix(docs)
   
