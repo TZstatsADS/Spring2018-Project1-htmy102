@@ -1,23 +1,20 @@
 ---
 title: "Project 1 An R Notebook Data Story on presidential inaugural speeches"
 author: "Yuhao Kang (yk2758)"
-output:
-  html_document:
-    df_print: paged
-  pdf_document: default
+output: html_notebook
 ---
 
 # Step 0: check and install needed packages. Load the libraries and functions. 
  
 
-```{r, message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 # load packages
 library("rvest")
 library("tibble")
 # You may need to run
 # sudo ln -f -s $(/usr/libexec/java_home)/jre/lib/server/libjvm.dylib /usr/local/lib
 # in order to load qdap
-# library("qdap")
+library("qdap")
 library("sentimentr")
 library("gplots")
 library("dplyr")
@@ -36,7 +33,7 @@ library(wordcloud)
 library(RColorBrewer)
 library(dplyr)
 library(tidytext)
-library(xlsx)
+library(readxl)
 source("../lib/plotstacked.R")
 source("../lib/speechFuncs.R")
 ```
@@ -101,7 +98,7 @@ inaug=inaug[-nrow(inaug),] # remove the last line, irrelevant due to error.
 ```
 
 ```{r}
-inaug.list <- read.xlsx("../data/InaugurationInfo.xlsx",sheetIndex = 1,header = T)
+inaug.list <- read_excel("../data/InaugurationInfo.xlsx")
 inaug.list <- cbind(inaug.list,inaug)
 
 inaug.list$fulltext=NA
@@ -236,8 +233,8 @@ topics.terms=NULL
 for(i in 1:k){
   topics.terms=rbind(topics.terms, ldaOut@terms[order(terms.beta[i,], decreasing = TRUE)[1:7]])
 }
-topics.terms
-ldaOut.terms
+head(topics.terms)
+head(ldaOut.terms)
 ```
 
 
@@ -254,8 +251,8 @@ corpus.list.df=cbind(corpus.list, topicProbabilities)
 ```
 
 ## Clustering of topics
-```{r, fig.width=6, fig.height=6}
-par(mar=c(1,1,1,1))
+```{r, fig.width=5, fig.height=9}
+#par(mar=c(1,1,1,1))
 topic.summary=tbl_df(corpus.list.df)%>%
               select(File, Military:Patriotism)%>%
               group_by(File)%>%
@@ -268,7 +265,7 @@ rownames(topic.summary)=topic.summary[,1]
 # [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
 # [13] "Community"  "Government"  "Patriotism"
 
-topic.plot=c(1, 13, 9, 11, 8, 3, 7)
+topic.plot=c(1 :15)
 print(topics.hash[topic.plot])
 
 heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
@@ -278,25 +275,42 @@ heatmap.2(as.matrix(topic.summary[,topic.plot+1]),
           trace = "none", density.info = "none")
 ```
 
-```{r, fig.width=3.3, fig.height=5}
-# [1] "Economy"         "America"         "Defense"         "Belief"         
-# [5] "Election"        "Patriotism"      "Unity"           "Government"     
-# [9] "Reform"          "Temporal"        "WorkingFamilies" "Freedom"        
-# [13] "Equality"        "Misc"            "Legislation"       
- 
+```{r, fig.width=7, fig.height=7}
+# [1] "Military"  "WorldPeace"  "Time"  "Economy", 
+# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
+# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
+# [13] "Community"  "Government"  "Patriotism"
 
-par(mfrow=c(3, 1), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
+par(mfcol=c(5, 2), mar=c(1,1,2,0), bty="n", xaxt="n", yaxt="n")
 
-topic.plot=c(1, 13, 14, 15, 8, 9, 12)
+topic.plot=c(1,2,4,5,8,9,10,11,12,15)
 print(topics.hash[topic.plot])
 
-speech.df=tbl_df(corpus.list.df)%>%filter(File=="JamesMonroe", Term==1)%>%
-  select(sent.id, Military:Patriotism)
-speech.df=as.matrix(speech.df)
-speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-plot.stacked(speech.df[,1], speech.df[,topic.plot+1], 
-             xlab="Sentences", ylab="Topic share", main="George Bush, Nomination")
+recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
+founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
+
+for(i in 5:1){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==recent_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=recent_presidents[i])
+  
+}
+
+for(i in 1:5){
+  speech.df=tbl_df(corpus.list.df)%>%filter(File==founding_presidents[i],  Term==1)%>%
+    select(sent.id, Military:Patriotism)
+  speech.df=as.matrix(speech.df)
+  speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+  speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+  plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+               xlab="Sentences", ylab="Topic share", main=founding_presidents[i])
+  
+}
+
 ```
 
 
