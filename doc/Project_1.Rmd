@@ -244,14 +244,14 @@ corpus.list.df=cbind(corpus.list, topicProbabilities)
 
 ###1.4.2. Clustering of topics  
 Now we have topics and thier probabilitie given by LDA model. Then we can cluster them.
-```{r, fig.width=5, fig.height=9}
+```{r, fig.width=6, fig.height=9}
 par(mar=c(1,1,1,1))
 topic.summary=tbl_df(corpus.list.df)%>%
               select(File, Military:Patriotism,Date)%>%
               group_by(File)%>%
               summarise_all(funs(mean))
 topic.summary=as.data.frame(topic.summary)
-rownames(topic.summary)=topic.summary[,1]
+rownames(topic.summary)=paste(topic.summary[,1],substr(topic.summary$Date,1,4),sep = "-")
 
 # [1] "Military"   "WorldPeace"  "Time"  "Economy", 
 # [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
@@ -266,8 +266,9 @@ topic.summary <- topic.summary[order(topic.summary$Date,decreasing = F),]
 heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
           scale = "column", key=F, Rowv=F,
           col = bluered(100),
-          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
-          trace = "none", density.info = "none", main="All presidents")
+          cexRow = 0.7, cexCol = 0.9, margins = c(8, 8),
+          trace = "none", density.info = "none",hline = 5,
+          main="All presidents")
 ```
 
 From above clustering fig, as time went by, the topics clustered also changed. For example, in early years, Equality, Legislation and Military are mentioned most. 
