@@ -247,7 +247,7 @@ Now we have topics and thier probabilitie given by LDA model. Then we can cluste
 ```{r, fig.width=5, fig.height=9}
 par(mar=c(1,1,1,1))
 topic.summary=tbl_df(corpus.list.df)%>%
-              select(File, Military:Patriotism)%>%
+              select(File, Military:Patriotism,Date)%>%
               group_by(File)%>%
               summarise_all(funs(mean))
 topic.summary=as.data.frame(topic.summary)
@@ -261,14 +261,18 @@ rownames(topic.summary)=topic.summary[,1]
 topic.plot=c(1 :15)
 print(topics.hash[topic.plot])
 
+topic.summary <- topic.summary[order(topic.summary$Date,decreasing = F),]
+
 heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
-          scale = "column", key=F, 
+          scale = "column", key=F, Rowv=F,
           col = bluered(100),
           cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
           trace = "none", density.info = "none", main="All presidents")
 ```
 
-From above clustering fig, it seems the topic did not clustered very clearly. So we go to the next step and pick up the most recent 5 presidents, the first 5 presidents and 5 presidents from the middle of timeline.  
+From above clustering fig, as time went by, the topics clustered also changed. For example, in early years, Equality, Legislation and Military are mentioned most. 
+
+We can find that the topic they emphasize are different from time to time. To be more clear, we can plot the topic share condition to the next step analysis. So we go to the next step and pick up the most recent 5 presidents, the first 5 presidents and 5 presidents from the middle of timeline.  
 
 ```{r}
 recent_presidents <- c("GeorgeBush","WilliamJClinton","GeorgeWBush","BarackObama","DonaldJTrump")
@@ -277,95 +281,6 @@ middle_presidents <- c("BenjaminHarrison","GroverCleveland-I","WilliamMcKinley",
 founding_presidents <- c("GeorgeWashington","JohnAdams","ThomasJefferson","JamesMadison","JamesMonroe")
 ```
 
-Then we do cluster again:  
-```{r, fig.width=5, fig.height=5}
-par(mar=c(1,1,1,1))
-
-recent_df <- NULL
-for(i in 1:length(recent_presidents)){
-  recent_df <- rbind(recent_df, corpus.list.df[corpus.list.df$File==recent_presidents[i],])
-}
-topic.summary=tbl_df(recent_df)%>%
-              select(File, Military:Patriotism)%>%
-              group_by(File)%>%
-              summarise_all(funs(mean))
-topic.summary=as.data.frame(topic.summary)
-rownames(topic.summary)=topic.summary[,1]
-
-# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
-# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
-# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
-# [13] "Community"  "Government"  "Patriotism"
-
-topic.plot=c(1 :15)
-print(topics.hash[topic.plot])
-
-heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
-          scale = "column", key=F, 
-          col = bluered(100),
-          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
-          trace = "none", density.info = "none",main="Recent 5 President")
-```
-
-```{r, fig.width=5, fig.height=5}
-par(mar=c(1,1,1,1))
-
-middle_df <- NULL
-for(i in 1:length(middle_presidents)){
-  middle_df <- rbind(middle_df, corpus.list.df[corpus.list.df$File==middle_presidents[i],])
-}
-topic.summary=tbl_df(middle_df)%>%
-              select(File, Military:Patriotism)%>%
-              group_by(File)%>%
-              summarise_all(funs(mean))
-topic.summary=as.data.frame(topic.summary)
-rownames(topic.summary)=topic.summary[,1]
-
-# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
-# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
-# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
-# [13] "Community"  "Government"  "Patriotism"
-
-topic.plot=c(1 :15)
-print(topics.hash[topic.plot])
-
-heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
-          scale = "column", key=F, 
-          col = bluered(100),
-          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
-          trace = "none", density.info = "none",main="Middle 5 Presidents")
-```
-
-```{r, fig.width=5, fig.height=5}
-par(mar=c(1,1,1,1))
-
-founding_df <- NULL
-for(i in 1:length(founding_presidents)){
-  founding_df <- rbind(founding_df, corpus.list.df[corpus.list.df$File==founding_presidents[i],])
-}
-topic.summary=tbl_df(founding_df)%>%
-              select(File, Military:Patriotism)%>%
-              group_by(File)%>%
-              summarise_all(funs(mean))
-topic.summary=as.data.frame(topic.summary)
-rownames(topic.summary)=topic.summary[,1]
-
-# [1] "Military"   "WorldPeace"  "Time"  "Economy", 
-# [5] "Nation"  "Responsibility"  "Hope"  "Equality", 
-# [9] "America"  "Politic"  "WorkingFamilies"  "Legislation", 
-# [13] "Community"  "Government"  "Patriotism"
-
-topic.plot=c(1 :15)
-print(topics.hash[topic.plot])
-
-heatmap.2(as.matrix(topic.summary[,topic.plot+1]), 
-          scale = "column", key=F, 
-          col = bluered(100),
-          cexRow = 0.9, cexCol = 0.9, margins = c(8, 8),
-          trace = "none", density.info = "none",main="First 5 Presidents")
-```
-
-From the respectively clustering, we can find that the topic they emphasize are different from time to time. To be more clear, we can plot the topic share condition to the next step analysis.   
 
 ###1.4.3. Topic shares  
 
